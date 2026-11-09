@@ -917,6 +917,20 @@ void WeightWindowsGenerator::update() const
 
   wws->update_weights(tally, tally_value_, threshold_, ratio_, method_);
 
+#ifdef OPENMC_MPI
+  // When tallies are reduced, only the master holds accumulated results, so
+  // the bounds computed on every other rank are all invalid. Give every rank
+  // the master's bounds.
+  if (settings::reduce_tallies) {
+    auto& lower = wws->lower_ww_bounds();
+    auto& upper = wws->upper_ww_bounds();
+    MPI_Bcast(lower.data(), static_cast<int>(lower.size()), MPI_DOUBLE, 0,
+      mpi::intracomm);
+    MPI_Bcast(upper.data(), static_cast<int>(upper.size()), MPI_DOUBLE, 0,
+      mpi::intracomm);
+  }
+#endif
+
   // if we're not doing on the fly generation, reset the tally results once
   // we're done with the update
   if (!on_the_fly_)
